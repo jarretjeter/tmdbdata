@@ -1,3 +1,10 @@
+# Directories
 data/
+__pycache__
 venv/
+.ipynb_checkpoints
+
+# Files
+config.json
+test.ipynb
 test.py

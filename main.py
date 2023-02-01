@@ -1,17 +1,23 @@
+import glob
+import json
 import logging
 from logging import INFO
 import os
 import pandas as pd
 import requests
+from storage import blobs_upload
 import sys
 import tmdbsimple as tmdb
 import typer
 
 app = typer.Typer()
 
-API_KEY = os.environ.get("TMDB_API_KEY")
-tmdb.API_KEY = API_KEY
-
+# Configurations
+file = open('./config.json', 'r')
+config = json.loads(file.read())
+tmdb.API_KEY = config['tmdb_api_key']
+tmdb.REQUESTS_SESSION = requests.Session()
+tmdb.REQUESTS_TIMEOUT = None
 
 logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s',
                     level=INFO,
@@ -19,97 +25,101 @@ logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)0
 logger: logging.Logger = logging
 
 
+
+@app.command("merge_dfs")
+def merge_dfs(region: str, year: int, page=None, total_pages=None) -> pd.DataFrame:
+    """
+    Create and save a merged dataframe from related csv's
+    If called from within get_movies(), will only merge if it finds the last page number/csv
+    """
+    if page == total_pages:
+        sub_dir = f"./data/{region}_movie_data_{year}"
+        try:
+            csv_list = [file for file in glob.glob(f'{sub_dir}/*.csv')]
+            logger.info(f"Merging {region} movie dataframes for year: {year}")
+            df = pd.concat([pd.read_csv(csv) for csv in csv_list])
+            df.sort_values(by=['REVENUE'], ascending=False, inplace=True)
+            df.drop_duplicates(inplace=True)
+            filename = f"{region}_movie_data_{year}-merged.csv"
+            logger.info("Saving merged dataframe to csv file")
+            df.to_csv(f"{sub_dir}/{filename}", index=False)
+            logger.info("Save complete")
+            return df
+        except ValueError as e:
+            logger.info(e)
+    else:
+        logger.info("Could not find last page. Skipping..")
+        return
+
+
+
 @app.command("get_movies")
-def get_movies(region: str, year_start: int, year_end: int):
+def get_movies(region: str, year_start: int, year_end: int, start_page=1):
     """
     
     """
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
-
-    # year_range = range(year_start, year_end + 1) if year_end == int else range(year_start, year_start + 1)
     year_range = range(year_start, year_end + 1)
-    batch = 1
     discover = tmdb.Discover()
-    # page_num = 1
+    discover.timeout = None
+    logger.info("start get_movies")
+    # MAKE SURE PAGE NUM IS WITHIN MAX PAGE RANGE
+    start_page = 1
     for year in year_range:
-        # while page_num < 3:
-        logger.info(f'current year: {year}')
-        response = discover.movie(region=region, page=1, primary_release_year=year, sort_by='primary_release_date_asc', include_adult=False)
-        try:
-            for page in range(1, response['total_pages'] + 1):
-                print("PAGE:", page,'/',response["total_pages"])
-                print("TOTAL RESULTS:",response['total_results'])
-                response = discover.movie(region=region, page=page, primary_release_year=year, sort_by='primary_release_date_asc', include_adult=False)
-                # print(response['results'][0].keys())
-                for result in discover.results:
-                    if len(data_dict['ID']) < 400:
-                        # if len(data_dict['ID']) < 500:
+        sub_dir = f"./data/{region}_movie_data_{year}"
+        if not os.path.exists(sub_dir): os.mkdir(sub_dir)
+        response = discover.movie(region=region, page=start_page, primary_release_year=year, include_adult=False, with_runtime_gte='40')
 
+        try:
+            for page in range(start_page, response['total_pages'] + 1):
+                logger.info(f"YEAR: {year}, PAGE: {page} / {response['total_pages']}")
+                logger.info(f"TOTAL RESULTS: {response['total_results']}")
+                response = discover.movie(region=region, page=page, primary_release_year=year, include_adult=False, with_runtime_gte='40')
+                for result in discover.results:
                         movie = tmdb.Movies(result['id'])
-                        # print(movie.info().keys())
                         id = movie.info()['id']
-                        # print("ID:", id)
                         data_dict['ID'].append(id)
                         title = movie.info()['title']
-                        # print("TITLE:", title)
                         data_dict['TITLE'].append(title)
                         og_title = movie.info()['original_title']
-                        # print("ORIGINAL_TITLE:", og_title)
                         data_dict['ORIGINAL_TITLE'].append(og_title)
                         release_date = movie.info()['release_date']
-                        # print("RELEASE_DATE:", release_date)
                         data_dict['RELEASE_DATE'].append(release_date)
                         og_lang = movie.info()['original_language']
-                        # print("ORIGINAL_LANGUAGE:", og_lang)
                         data_dict['ORIGINAL_LANGUAGE'].append(og_lang)
                         director_list = []
                         crew_members = movie.credits()['crew']
                         for member in crew_members:
                             if member['job'] == "Director":
-                                # print('NAME:',member['name'])
-                                # print(crew)
-                                # logger.info('appending director name')
                                 director_list.append(member['name'])
-                        # logger.info('appending director list')
                         data_dict['DIRECTOR'].append(director_list)
                         genres = movie.info()['genres']
-                        # print("GENRES:")
                         genre_list = []
                         for genre in genres:
-                            # print(genre['name'])
                             genre_list.append(genre['name'])
                         data_dict['GENRES'].append(genre_list)
                         prod_countries = movie.info()['production_countries']
-                        # print("PRODUCTION_COUNTRIES:")
                         prod_countries_list = []
                         for country in prod_countries:
-                            # print(country['name'])
                             prod_countries_list.append(country['name'])
                         data_dict['PRODUCTION_COUNTRIES'].append(prod_countries_list)
                         revenue = movie.info()['revenue']
-                        # print("REVENUE:", revenue)
                         data_dict['REVENUE'].append(revenue)
-                # page_num += 1
-                    # return
-                    else:
-                        logger.info("Saving current batch to csv")
-                        df = pd.DataFrame(data_dict)
-                        df.to_csv(f'./data/{region}_movie_data{batch}.csv', index=False)
 
-                        data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
-                        batch += 1
-                logger.info('next page')
+                logger.info(f"Saving current page {page} to csv")
+                df = pd.DataFrame(data_dict)
+                df.to_csv(f'{sub_dir}/{region}_movie_data_{year}-{page}.csv', index=False)
+                logger.info('saved')
+                data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
         except requests.exceptions.RequestException as e:
             logger.info(e)
-            logger.info("Saving current batch to csv")
-            df = pd.DataFrame(data_dict)
-            df.to_csv(f'./data/{region}_movie_data{batch}.csv', index=False)
-
-            data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
-            batch += 1
-
-    df = pd.DataFrame(data_dict)
-    df.to_csv(f'./data/{region}_movie_data{batch}.csv', index=False)
+        print(start_page)
+        print(page)
+        print(response['total_pages'])
+        merge_dfs(region, year, page=page, total_pages=response['total_pages'])
+        blobs_upload(region=region, year=year)
+        start_page = 1
+    return
 
 
 if __name__ == "__main__":
