@@ -4,6 +4,7 @@ from logging import INFO
 import os
 import pandas as pd
 import requests
+from storage import blobs_upload
 import sys
 import tmdbsimple as tmdb
 import typer
@@ -50,7 +51,7 @@ def merge_dfs(region: str, year: int, page=None, total_pages=None) -> pd.DataFra
 
 
 @app.command("get_movies")
-def get_movies(region: str, year_start: int, year_end: int):
+def get_movies(region: str, year_start: int, year_end: int, start_page=1):
     """
     
     """
@@ -113,6 +114,7 @@ def get_movies(region: str, year_start: int, year_end: int):
         print(page)
         print(response['total_pages'])
         merge_dfs(region, year, page=page, total_pages=response['total_pages'])
+        blobs_upload(region=region, year=year)
         start_page = 1
     return
 
