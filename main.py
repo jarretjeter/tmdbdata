@@ -1,4 +1,5 @@
 import glob
+import json
 import logging
 from logging import INFO
 import os
@@ -11,8 +12,10 @@ import typer
 
 app = typer.Typer()
 
-API_KEY = os.environ.get("TMDB_API_KEY")
-tmdb.API_KEY = API_KEY
+# Configurations
+file = open('./config.json', 'r')
+config = json.loads(file.read())
+tmdb.API_KEY = config['tmdb_api_key']
 tmdb.REQUESTS_SESSION = requests.Session()
 tmdb.REQUESTS_TIMEOUT = None
 
