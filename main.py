@@ -5,6 +5,7 @@ from logging import INFO
 import os
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter, Retry
 from storage import blobs_upload
 import sys
 import tmdbsimple as tmdb
@@ -16,8 +17,12 @@ app = typer.Typer()
 file = open('./config.json', 'r')
 config = json.loads(file.read())
 tmdb.API_KEY = config['tmdb_api_key']
-tmdb.REQUESTS_SESSION = requests.Session()
-tmdb.REQUESTS_TIMEOUT = None
+
+sess = requests.Session()
+retries = Retry(total=5, backoff_factor=0.7, status_forcelist=[500, 503, 504])
+tmdb.REQUESTS_SESSION = sess
+tmdb.REQUESTS_SESSION.mount("https://", HTTPAdapter(max_retries=retries))
+tmdb.REQUESTS_TIMEOUT = (3600)
 
 logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s',
                     level=INFO,
@@ -26,6 +31,7 @@ logger: logging.Logger = logging
 
 
 
+### WRITE CODE TO CHECK IF ANY PAGES ARE MISSING
 @app.command("merge_dfs")
 def merge_dfs(region: str, year: int, page=None, total_pages=None) -> pd.DataFrame:
     """
@@ -56,15 +62,19 @@ def merge_dfs(region: str, year: int, page=None, total_pages=None) -> pd.DataFra
 @app.command("get_movies")
 def get_movies(region: str, year_start: int, year_end: int, start_page=1):
     """
-    
+    Retrieves data on movies of a specified range of years from the tmdb api
+    region: the country to filter by
+    year_start: the first year to iterate through
+    year_end: the last year to iterate through
+    start_page: page of results to retrieve data from
     """
+
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
     year_range = range(year_start, year_end + 1)
     discover = tmdb.Discover()
-    discover.timeout = None
     logger.info("start get_movies")
     # MAKE SURE PAGE NUM IS WITHIN MAX PAGE RANGE
-    start_page = 1
+    start_page = 25
     for year in year_range:
         sub_dir = f"./data/{region}_movie_data_{year}"
         if not os.path.exists(sub_dir): os.mkdir(sub_dir)
@@ -113,6 +123,7 @@ def get_movies(region: str, year_start: int, year_end: int, start_page=1):
                 data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
         except requests.exceptions.RequestException as e:
             logger.info(e)
+            start_page = 1
         print(start_page)
         print(page)
         print(response['total_pages'])
