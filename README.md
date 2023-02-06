@@ -1,13 +1,15 @@
 ![vizualization](./img/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg)
 # The Movie Database Data
 
-#### By _Jarret Jeter_
+### By _Jarret Jeter_
 
-#### _{Brief description of application}_
+### A python script to extract film data from The Movie Database API using the api wrapper [tmdbsimple](https://github.com/celiao/tmdbsimple).
 
 
 ## Technologies Used
 
+* _azure data lake storage gen2_
+* _power BI_
 * _python_
 * _pandas_
 * _tmdbsimple_
