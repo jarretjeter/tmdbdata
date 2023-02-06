@@ -15,7 +15,7 @@
 
 ## Description
 
-__
+![visualization](./img/us_movie_revenue.pdf)
 
 ## Setup/Installation Requirements
 
