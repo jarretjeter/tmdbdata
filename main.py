@@ -66,15 +66,14 @@ def get_movies(region: str, year_start: int, year_end: int, start_page=1):
     region: the country to filter by
     year_start: the first year to iterate through
     year_end: the last year to iterate through
-    start_page: page of results to retrieve data from
+    start_page: page of results to retrieve data from. Make sure start_page is within max page range
     """
 
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
     year_range = range(year_start, year_end + 1)
+    start_page = int(start_page)
     discover = tmdb.Discover()
     logger.info("start get_movies")
-    # MAKE SURE PAGE NUM IS WITHIN MAX PAGE RANGE
-    start_page = 25
     for year in year_range:
         sub_dir = f"./data/{region}_movie_data_{year}"
         if not os.path.exists(sub_dir): os.mkdir(sub_dir)
@@ -119,14 +118,11 @@ def get_movies(region: str, year_start: int, year_end: int, start_page=1):
                 logger.info(f"Saving current page {page} to csv")
                 df = pd.DataFrame(data_dict)
                 df.to_csv(f'{sub_dir}/{region}_movie_data_{year}-{page}.csv', index=False)
-                logger.info('saved')
                 data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
         except requests.exceptions.RequestException as e:
             logger.info(e)
+            # Begin iterating through next year of movies, starting at page 1
             start_page = 1
-        print(start_page)
-        print(page)
-        print(response['total_pages'])
         merge_dfs(region, year, page=page, total_pages=response['total_pages'])
         blobs_upload(region=region, year=year)
         start_page = 1
