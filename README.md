@@ -3,11 +3,10 @@
 
 #### By Jarret Jeter
 
-#### A python script to extract film data from The Movie Database API using the api wrapper [tmdbsimple](https://github.com/celiao/tmdbsimple).
+### A python script to extract film data from The Movie Database's API using the api wrapper [tmdbsimple](https://github.com/celiao/tmdbsimple).
 
 
 ## Technologies Used
-
 * _azure data lake storage gen2_
 * _power BI_
 * _python_
@@ -31,11 +30,13 @@ You'll need a [tmdb](https://www.themoviedb.org/) account to access the site's A
 * Once that's setup you can run the command 'get_movies' in the terminal along with the arguments you want to begin fetching the data.
 
 ## Known Bugs
-
 * Don't currently have code written to check for any missing pages/csv's before merging together
 
-## License
+## Potential to-do:
+* run through azure
+* add concurrency to speed up script
 
+## License
 [MIT](https://github.com/jarretjeter/tmdbdata/blob/main/LICENSE.txt)
 
 _Copyright (c) January 24 2023 Jarret Jeter_
