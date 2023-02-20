@@ -24,14 +24,11 @@ tmdb.REQUESTS_SESSION = sess
 tmdb.REQUESTS_SESSION.mount("https://", HTTPAdapter(max_retries=retries))
 tmdb.REQUESTS_TIMEOUT = (3600)
 
-logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s',
-                    level=INFO,
-                    stream=sys.stderr)
+logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger: logging.Logger = logging
 
 
 
-### WRITE CODE TO CHECK IF ANY PAGES ARE MISSING
 @app.command("merge_dfs")
 def merge_dfs(region: str, year: int, page=None, total_pages=None) -> pd.DataFrame:
     """
@@ -54,7 +51,7 @@ def merge_dfs(region: str, year: int, page=None, total_pages=None) -> pd.DataFra
         except ValueError as e:
             logger.info(e)
     else:
-        logger.info("Could not find last page. Skipping..")
+        # logger.info("Could not find last page. Skipping..")
         return
 
 
@@ -73,17 +70,19 @@ def get_movies(region: str, year_start: int, year_end: int, start_page=1):
     year_range = range(year_start, year_end + 1)
     start_page = int(start_page)
     discover = tmdb.Discover()
-    logger.info("start get_movies")
+    missing_pages = {}
     for year in year_range:
         sub_dir = f"./data/{region}_movie_data_{year}"
         if not os.path.exists(sub_dir): os.mkdir(sub_dir)
+        missing_pages[year] = []
+
         response = discover.movie(region=region, page=start_page, primary_release_year=year, include_adult=False, with_runtime_gte='40')
+        logger.info(f"Starting at YEAR: {year}, PAGE: {page}/{response['total_pages']}")
 
         try:
             for page in range(start_page, response['total_pages'] + 1):
-                logger.info(f"YEAR: {year}, PAGE: {page} / {response['total_pages']}")
-                logger.info(f"TOTAL RESULTS: {response['total_results']}")
                 response = discover.movie(region=region, page=page, primary_release_year=year, include_adult=False, with_runtime_gte='40')
+                logger.info(f"Year:{year}, Page: {page}")
                 for result in discover.results:
                         movie = tmdb.Movies(result['id'])
                         id = movie.info()['id']
@@ -121,11 +120,15 @@ def get_movies(region: str, year_start: int, year_end: int, start_page=1):
                 data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
         except requests.exceptions.RequestException as e:
             logger.info(e)
+            missing_pages[year].append(page)
+            logger.info(f"Failed to reach page: {page}\nPages Missing: {missing_pages}")
             # Begin iterating through next year of movies, starting at page 1
             start_page = 1
         merge_dfs(region, year, page=page, total_pages=response['total_pages'])
+        logger.info(f"Missing pages for year {year}: {missing_pages[year]}\nTotal: {missing_pages}")
         blobs_upload(region=region, year=year)
         start_page = 1
+    logger.info(f"Total Pages Missing: {missing_pages}")
     return
 
 
