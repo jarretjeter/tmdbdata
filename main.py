@@ -28,14 +28,13 @@ logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)0
 logger: logging.Logger = logging
 
 
-# create optional upload to blob storage
 @app.command("merge_dfs")
-def merge_dfs(region: str, year: int, missing_pages=None) -> pd.DataFrame:
+def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
     """
     Create and save a merged dataframe from related csv's
     If called from within get_movies(), will only merge if there are no missing pages for the selected year
     """
-    if missing_pages == None or missing_pages[year] == []:
+    if missing == None or missing[year] == []:
         sub_dir = f"./data/{region}_movie_data_{year}"
         try:
             csv_list = [file for file in glob.glob(f'{sub_dir}/*.csv')]
@@ -55,7 +54,7 @@ def merge_dfs(region: str, year: int, missing_pages=None) -> pd.DataFrame:
     
 
 
-def retry_missing(region, missing, sub_dir):
+def retry_missing(region: str, sub_dir: str, missing):
     """
     Attempt to retrieve any missing pages from earlier failed requests
     """
@@ -111,7 +110,7 @@ def retry_missing(region, missing, sub_dir):
 
 
 @app.command("get_movies")
-def get_movies(region: str, year_start: int, year_end: int, start_page=1):
+def get_movies(region: str, year_start: int, year_end: int, start_page: int=1, upload: bool=True):
     """
     Retrieves data on movies of a specified range of years from the tmdb api
     region: the country to filter by
@@ -177,9 +176,9 @@ def get_movies(region: str, year_start: int, year_end: int, start_page=1):
                 missing_pages[year].append(page)
                 logger.info(f"""Failed to reach PAGE: {page}\nMissing: {missing_pages}\nTrying next page""")
         logger.info(f"Missing pages for YEAR {year}: {missing_pages[year]}")
-        retry_missing(region=region, missing=missing_pages, sub_dir=sub_dir) if missing_pages[year] != [] else None
-        merge_dfs(region, year, missing_pages=missing_pages)
-        blobs_upload(region=region, year=year)
+        retry_missing(region, sub_dir, missing_pages) if missing_pages[year] != [] else None
+        merge_dfs(region, year, missing_pages)
+        blobs_upload(region, year) if upload else None
         # Begin iterating through next year of movies, starting at page 1
         start_page = 1
     logger.info(f"Total Missing: {missing_pages}")
