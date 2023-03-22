@@ -182,7 +182,7 @@ def get_page(region: str, year: int, page: int=1, retry: bool=False):
 
 
 @app.command("run_main")
-def main(region: str, year_start: int, year_end: int, start_page: int=1):
+def main(region: str, year_start: int, year_end: int):
     """
     
     """
@@ -190,6 +190,7 @@ def main(region: str, year_start: int, year_end: int, start_page: int=1):
     year_range = range(year_start, year_end + 1)
     futures = []
     mssng_pages = {}
+    
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for year in year_range:
             pages = list_pages(region, year)
