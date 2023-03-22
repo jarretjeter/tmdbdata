@@ -194,7 +194,7 @@ def main(region: str, year_start: int, year_end: int):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for year in year_range:
             pages = list_pages(region, year)
-            mssng_pages[year] = [5]
+            mssng_pages[year] = []
             for page in pages:
                 futures.append(executor.submit(get_page, region, year, page))
 
