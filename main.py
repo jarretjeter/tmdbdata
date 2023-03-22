@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 import requests
 from requests.adapters import HTTPAdapter, Retry
-from storage import blobs_upload
+from storage import blob_upload
 import sys
 import tmdbsimple as tmdb
 import time
@@ -182,7 +182,7 @@ def get_page(region: str, year: int, page: int=1, retry: bool=False):
 
 
 @app.command("run_main")
-def main(region: str, year_start: int, year_end: int):
+def main(region: str, year_start: int, year_end: int, upload: bool=True):
     """
     
     """
@@ -207,6 +207,7 @@ def main(region: str, year_start: int, year_end: int):
         for year in year_range:
             retry_missing(region=region, year=year, mssng_pages=mssng_pages) if mssng_pages[year] != [] else None
             merge_dfs(region, year, missing=mssng_pages)
+            blob_upload(region=region, year=year) if upload else None
     tm2 = time.perf_counter()
     print(f"Total time elapsed: {tm2 - tm1:0.2f} seconds")
 
