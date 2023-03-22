@@ -36,7 +36,7 @@ def show_containers():
 
 
 @blobs.command("upload")
-def blobs_upload(region: str, year: str):
+def blob_upload(region: str, year: str):
     """
     Upload a single file to an Azure blob container
     """
