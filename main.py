@@ -60,7 +60,7 @@ def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
         except ValueError as e:
             logger.info(e)
     else:
-        logger.info("All pages not found, stopping merge")
+        logger.info("All pages not found, cannot merge")
         return    
 
 
@@ -194,20 +194,19 @@ def main(region: str, year_start: int, year_end: int):
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for year in year_range:
             pages = list_pages(region, year)
-            mssng_pages[year] = []
+            mssng_pages[year] = [5]
             for page in pages:
                 futures.append(executor.submit(get_page, region, year, page))
-                time.sleep(0.5)
+
         for future in concurrent.futures.as_completed(futures):
             f_year = future.result()[1]
             f_mssng_page = future.result()[2]
             mssng_pages[f_year].append(f_mssng_page) if f_mssng_page != None else None
             logger.info(f"Missing: {mssng_pages}")
-        
-    for year in mssng_pages:
-        if mssng_pages[year] != []:
-            [get_page(region=region, year=year, page=page, retry=True) for page in mssng_pages[year]]
-        merge_dfs(region=region, year=year)
+
+        for year in year_range:
+            retry_missing(region=region, year=year, mssng_pages=mssng_pages) if mssng_pages[year] != [] else None
+            merge_dfs(region, year, missing=mssng_pages)
     tm2 = time.perf_counter()
     print(f"Total time elapsed: {tm2 - tm1:0.2f} seconds")
 
