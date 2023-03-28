@@ -30,10 +30,22 @@ logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s
 logger: logging.Logger = logging
 
 
-def output_csv(region: str, year: int, df: pd.DataFrame, filename: str):
+def output_csv(region: str, year: int, df: pd.DataFrame, filename: str) -> None:
     """
     Create an output subdirectory and save a csv to it
+
+    Args:
+        region: str
+            The country that the subdirectory will have included in its name
+        year: int
+            The year that the subdirectory will have included in its name
+        df: pd.Dataframe
+            dataframe object to save
+        filename: int
+            name of the output csv file
+    Returns: None
     """
+
     data_dir = "./data"
     output_dir = Path(f"{data_dir}/{region}_movie_data_{year}")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -43,8 +55,18 @@ def output_csv(region: str, year: int, df: pd.DataFrame, filename: str):
 def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
     """
     Create and save a merged dataframe from related csv's
-    If called from within get_movies(), will only merge if there are no missing pages for the selected year
+    If called from within main(), will only merge if there are no missing pages for the selected year
+
+    Args:
+        region: str
+            Country that will be included in the csv filename
+        year: int
+            Year that will be included in the csv filename
+        missing: dict, default None
+            (Optional) The dictionary to check for any pages missing
+    Returns: None
     """
+
     if missing == None or missing[year] == []:
         sub_dir = f"./data/{region}_movie_data_{year}"
         try:
@@ -64,10 +86,20 @@ def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
         return    
 
 
-def retry_missing(region: str, year: int, mssng_pages):
+def retry_missing(region: str, year: int, mssng_pages) -> dict:
     """
     Attempt to retrieve any missing pages from earlier failed requests
+
+    Args:
+        region: str
+            Country to filter by
+        year: int
+            Year to filter by
+        mssng_pages: dict
+            Dictionary consisting of key-value pairs of {year: [list of page numbers missing]}
+    Returns: dict of any pages still missing
     """
+
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
     logger.info("Attempting retrieval of missing pages...")
     for page in mssng_pages[year][:]:
@@ -118,10 +150,18 @@ def retry_missing(region: str, year: int, mssng_pages):
 
 
 @app.command("list_pages")
-def list_pages(region: str, year: int):
+def list_pages(region: str, year: int) -> list:
     """
     Retrieve total pages of discover.movie() search
+
+    Args:
+        region: str
+            Country to filter by
+        year: int
+            Year to filter by
+    Returns: a list of all pages returned from search response
     """
+
     response = discover.movie(region=region, primary_release_year=year, include_adult=False, with_runtime_gte='40')
     pages = [page for page in range(1, response['total_pages'] + 1)]
     logger.info(f"YEAR {year}: PAGES {pages}")
@@ -129,10 +169,20 @@ def list_pages(region: str, year: int):
 
 
 @app.command("get_page")
-def get_page(region: str, year: int, page: int=1, retry: bool=False):
+def get_page(region: str, year: int, page: int=1) -> any:
     """
     Obtain metadata for each film on discover.movie() response
+
+    Args:
+        region: str
+            Country to filter by
+        year: int
+            Year to filter by
+        page: int
+            Page number to send a request to
+    Returns: region, year, failed_page (to be saved to a dict)
     """
+
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
     failed_page = None
     response = discover.movie(region=region, page=page, primary_release_year=year, include_adult=False, with_runtime_gte='40')
@@ -172,7 +222,6 @@ def get_page(region: str, year: int, page: int=1, retry: bool=False):
         df = pd.DataFrame(data_dict)
         filename = f"{region}_movie_data_{year}-{page}.csv"
         output_csv(region=region, year=year, df=df, filename=filename)
-        logger.info(f"Retry attempt for YEAR: {year}, Page: {page} successful") if retry else None
         data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'DIRECTOR': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'REVENUE': []}
     except requests.exceptions.RequestException as e:
         logger.info(e)
@@ -182,9 +231,20 @@ def get_page(region: str, year: int, page: int=1, retry: bool=False):
 
 
 @app.command("run_main")
-def main(region: str, year_start: int, year_end: int, upload: bool=True):
+def main(region: str, year_start: int, year_end: int, upload: bool=True) -> any:
     """
-    
+    Pipeline orchestration to get all data for every page in a specified range of years
+
+    Args:
+        region: str
+            Country to filter by
+        year_start: int
+            Year to start filtering at
+        year_end: int
+            Year to stop filtering at
+        upload: bool, default True
+            (Optional) Upload data to Azure storage
+    Returns: None
     """
     tm1 = time.perf_counter()
     year_range = range(year_start, year_end + 1)
