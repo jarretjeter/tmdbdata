@@ -51,6 +51,7 @@ def output_csv(region: str, year: int, df: pd.DataFrame, filename: str) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_dir / filename, index=False)
 
+
 @app.command("merge_dfs")
 def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
     """
@@ -168,10 +169,10 @@ def list_pages(region: str, year: int) -> list:
     return pages
 
 
-@app.command("get_page")
-def get_page(region: str, year: int, page: int=1) -> any:
+@app.command("get_data")
+def get_data(region: str, year: int, page: int=1) -> any:
     """
-    Obtain metadata for each film on discover.movie() response
+    Obtain metadata for each film returned from discover.movie() response
 
     Args:
         region: str
@@ -256,14 +257,14 @@ def main(region: str, year_start: int, year_end: int, upload: bool=True) -> any:
             pages = list_pages(region, year)
             mssng_pages[year] = []
             for page in pages:
-                futures.append(executor.submit(get_page, region, year, page))
+                futures.append(executor.submit(get_data, region, year, page))
 
         for future in concurrent.futures.as_completed(futures):
             f_year = future.result()[1]
-            f_mssng_page = future.result()[2]
-            mssng_pages[f_year].append(f_mssng_page) if f_mssng_page != None else None
-            logger.info(f"Missing: {mssng_pages}")
-
+            f_page = future.result()[2]
+            mssng_pages[f_year].append(f_page) if f_page != None else None
+            
+        logger.info(f"Missing: {mssng_pages}")
         for year in year_range:
             retry_missing(region=region, year=year, mssng_pages=mssng_pages) if mssng_pages[year] != [] else None
             merge_dfs(region, year, missing=mssng_pages)
