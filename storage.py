@@ -2,6 +2,8 @@ from azure.storage.blob import BlobServiceClient
 import json
 import logging
 from logging import INFO
+import pandas as pd
+import pymysql.cursors
 import sys
 import typer
 
@@ -10,21 +12,28 @@ logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)0
                     stream=sys.stderr)
 logger: logging.Logger = logging
 
-blobs = typer.Typer()
+storage = typer.Typer()
 
-# Configurations
 file = open('./config.json', 'r')
 config = json.loads(file.read())
+
+# Azure Storage Configuarations
 storage_account = config['storage_account']
 stor_conn_str = storage_account['conn_str']
 container_name = storage_account['container']
 container_movie_dir = storage_account['movie_dir']
 
+# MySQL Configurations
+database = config['database']
+user = database['user']
+passwd = database['passwd']
+db_name = database['db_name']
+
 blob_service_client = BlobServiceClient.from_connection_string(stor_conn_str)
 
 
 
-@blobs.command("containers")
+@storage.command("containers")
 def show_containers():
     """
     List all containers in a storage account
@@ -35,7 +44,7 @@ def show_containers():
 
 
 
-@blobs.command("upload")
+@storage.command("upload")
 def blob_upload(region: str, year: str):
     """
     Upload a single file to an Azure blob container
@@ -54,6 +63,37 @@ def blob_upload(region: str, year: str):
         print(f"Exception: \n{ex}")
 
 
+# CREATE FUNCTION TO DELETE BLOBS FROM CLI
+
+
+def to_mysql(df: pd.DataFrame, year: int):
+    """
+    Insert Pandas DataFrame rows into a MySQL table.
+
+    Args:
+        df: pd.DataFrame
+            DataFrame object to use
+    Returns: None
+    """
+    
+    for row in df.itertuples(index=False):
+
+        conn = pymysql.connect(host='localhost',
+                            user=user,
+                            password=passwd,
+                            database=db_name,
+                            cursorclass=pymysql.cursors.DictCursor)
+        
+        with conn:
+            with conn.cursor() as cursor:
+                sql = "INSERT INTO `movies` (`id`, `original_title`, `title`, `language`, `release_date`) VALUES (%s, %s, %s, %s, %s)"
+                cursor.execute(sql, (row.ID, row.ORIGINAL_TITLE, row.TITLE, row.ORIGINAL_LANGUAGE, 
+                row.RELEASE_DATE))
+
+            conn.commit()
+
+    logger.info(f"Table insertions for {year} complete.")
+
 
 if __name__ == "__main__":
-    blobs()
+    storage()
