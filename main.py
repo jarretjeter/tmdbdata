@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 import requests
 from requests.adapters import HTTPAdapter, Retry
-from storage import blob_upload
+from storage import blob_upload, to_mysql
 import sys
 import tmdbsimple as tmdb
 import time
@@ -65,7 +65,7 @@ def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
             Year that will be included in the csv filename
         missing: dict, default None
             (Optional) The dictionary to check for any pages missing
-    Returns: None
+    Returns: pd.DataFrame
     """
 
     if missing == None or missing[year] == []:
@@ -267,8 +267,11 @@ def main(region: str, year_start: int, year_end: int, upload: bool=True) -> any:
         logger.info(f"Missing: {mssng_pages}")
         for year in year_range:
             retry_missing(region=region, year=year, mssng_pages=mssng_pages) if mssng_pages[year] != [] else None
-            merge_dfs(region, year, missing=mssng_pages)
-            blob_upload(region=region, year=year) if upload else None
+            df = merge_dfs(region, year, missing=mssng_pages)
+            if upload:
+                blob_upload(region=region, year=year)
+                to_mysql(df=df, year=year)
+
     tm2 = time.perf_counter()
     print(f"Total time elapsed: {tm2 - tm1:0.2f} seconds")
 
