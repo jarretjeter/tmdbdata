@@ -57,7 +57,7 @@ def blob_upload(region: str, year: str):
 
         with open(path, "rb") as data:
             logger.info(f"Uploading to Azure Storage as blob: {filename}")
-            blob_client.upload_blob(data)
+            blob_client.upload_blob(data, overwrite=True)
             logger.info(f"Uploaded {filename} successfully")
     except Exception as ex:
         print(f"Exception: \n{ex}")
@@ -75,24 +75,31 @@ def to_mysql(df: pd.DataFrame, year: int):
             DataFrame object to use
     Returns: None
     """
-    
-    for row in df.itertuples(index=False):
+    try:
+        num_rows = len(df)
+        inserted = 0
+        for row in df.itertuples(index=False):
 
-        conn = pymysql.connect(host='localhost',
-                            user=user,
-                            password=passwd,
-                            database=db_name,
-                            cursorclass=pymysql.cursors.DictCursor)
-        
-        with conn:
-            with conn.cursor() as cursor:
-                sql = "INSERT INTO `movies` (`id`, `original_title`, `title`, `language`, `release_date`) VALUES (%s, %s, %s, %s, %s)"
-                cursor.execute(sql, (row.ID, row.ORIGINAL_TITLE, row.TITLE, row.ORIGINAL_LANGUAGE, 
-                row.RELEASE_DATE))
+            conn = pymysql.connect(host='localhost',
+                                user=user,
+                                password=passwd,
+                                database=db_name,
+                                cursorclass=pymysql.cursors.DictCursor)
+            
+            with conn:
+                with conn.cursor() as cursor:
+                    movies_insert = "INSERT INTO `movies` (`id`, `original_title`, `title`, `language`, `release_date`) VALUES (%s, %s, %s, %s, %s)"
+                    cursor.execute(movies_insert, (row.ID, row.ORIGINAL_TITLE, row.TITLE, row.ORIGINAL_LANGUAGE, 
+                    row.RELEASE_DATE))
+                conn.commit()
+                inserted += 1
+        # Insertions per table
+        logger.info(f"Table insertions for {year} complete. {inserted}/{num_rows} rows inserted.")
 
-            conn.commit()
+    except pymysql.Error as e:
+        logger.info(e)
+        conn.rollback()
 
-    logger.info(f"Table insertions for {year} complete.")
 
 
 if __name__ == "__main__":
