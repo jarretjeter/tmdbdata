@@ -1,3 +1,4 @@
+from ast import literal_eval
 from azure.storage.blob import BlobServiceClient
 import json
 import logging
@@ -57,13 +58,78 @@ def blob_upload(region: str, year: str):
 
         with open(path, "rb") as data:
             logger.info(f"Uploading to Azure Storage as blob: {filename}")
-            blob_client.upload_blob(data)
+            blob_client.upload_blob(data, overwrite=True)
             logger.info(f"Uploaded {filename} successfully")
     except Exception as ex:
         print(f"Exception: \n{ex}")
 
 
 # CREATE FUNCTION TO DELETE BLOBS FROM CLI
+
+
+def insert_movies(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row into MySQL movies table
+    """
+    sql = """INSERT INTO `movies` (`id`, `original_title`, `title`, `language`, `release_date`)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY
+                    UPDATE original_title=VALUES(original_title), title=VALUES(title), language=VALUES(language), release_date=VALUES(release_date)"""
+    cursor.execute(sql, (row.ID, row.ORIGINAL_TITLE, row.TITLE, row.ORIGINAL_LANGUAGE, 
+                    row.RELEASE_DATE))
+
+
+def insert_genres(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row into MySQL genres table
+    """
+    sql = """INSERT INTO `genres` (`id`, `name`)
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY
+                    UPDATE name=VALUES(name)"""
+    genres_list = row.GENRES
+    genres_list = literal_eval(genres_list)
+    if len(genres_list) >= 1:
+        for genre in genres_list:
+            id = genre['id']
+            name = genre['name']
+            cursor.execute(sql, (id, name))
+
+
+def insert_directors(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row into MySQL directors table
+    """
+    sql = """INSERT INTO `directors` (`id`, `name`)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY
+                UPDATE name=VALUES(name)"""
+    director_list = row.DIRECTORS
+    director_list = literal_eval(director_list)
+    if len(director_list) >= 1:
+        for director in director_list:
+            id = director['id']
+            name = director['name']
+            cursor.execute(sql, (id, name))
+
+
+def insert_actors(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row into MySQL actors table
+    """
+    sql = """INSERT INTO `actors` (`id`, `name`)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY
+                UPDATE name=VALUES(name)"""
+    cast_list = row.CAST
+    cast_list = literal_eval(cast_list)
+    if len(cast_list) >= 1:
+        for member in cast_list:
+            print(member)
+            print(type(member))
+            id = member['id']
+            name = member['name']
+            cursor.execute(sql, (id, name))
 
 
 def to_mysql(df: pd.DataFrame, year: int):
@@ -75,24 +141,31 @@ def to_mysql(df: pd.DataFrame, year: int):
             DataFrame object to use
     Returns: None
     """
+    try:
+        num_rows = len(df)
+        inserted = 0
+        for row in df.itertuples(index=False):
+
+            conn = pymysql.connect(host='localhost',
+                                user=user,
+                                password=passwd,
+                                database=db_name,
+                                cursorclass=pymysql.cursors.DictCursor)
+            with conn:
+                with conn.cursor() as cursor:
+                    insert_movies(row=row, cursor=cursor)
+                    insert_genres(row=row, cursor=cursor)
+                    insert_directors(row=row, cursor=cursor)
+                    insert_actors(row=row, cursor=cursor)
+                conn.commit()
+                inserted += 1
+        # Insertions per table
+        logger.info(f"Table insertions for {year} complete. {inserted}/{num_rows} rows inserted.")
     
-    for row in df.itertuples(index=False):
+    except pymysql.Error as e:
+        logger.info(e)
+        conn.rollback()
 
-        conn = pymysql.connect(host='localhost',
-                            user=user,
-                            password=passwd,
-                            database=db_name,
-                            cursorclass=pymysql.cursors.DictCursor)
-        
-        with conn:
-            with conn.cursor() as cursor:
-                sql = "INSERT INTO `movies` (`id`, `original_title`, `title`, `language`, `release_date`) VALUES (%s, %s, %s, %s, %s)"
-                cursor.execute(sql, (row.ID, row.ORIGINAL_TITLE, row.TITLE, row.ORIGINAL_LANGUAGE, 
-                row.RELEASE_DATE))
-
-            conn.commit()
-
-    logger.info(f"Table insertions for {year} complete.")
 
 
 if __name__ == "__main__":
