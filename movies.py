@@ -68,6 +68,7 @@ def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
     if missing == None or missing[year] == []:
         sub_dir = f"./data/{region}_movie_data_{year}"
         try:
+            # IGNORE MERGED CSV's, IF ANY
             csv_list = [file for file in glob.glob(f'{sub_dir}/*.csv')]
             logger.info(f"Merging {region} movie dataframes for YEAR: {year}...")
             df = pd.concat([pd.read_csv(csv) for csv in csv_list])
@@ -98,7 +99,7 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
     Returns: dict[int, list[int]] of any pages still missing
     """
 
-    data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTOR': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
+    data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTORS': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
     logger.info("Attempting retrieval of missing pages...")
     for page in mssng_pages[year][:]:
         try:
@@ -112,7 +113,7 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
                 data_dict['RELEASE_DATE'].append(gen_info[2])
                 data_dict['ORIGINAL_LANGUAGE'].append(gen_info[3])
                 data_dict['PLOT'].append(gen_info[4])
-                data_dict['DIRECTOR'].append(get_directors(movie=movie))
+                data_dict['DIRECTORS'].append(get_directors(movie=movie))
                 data_dict['CAST'].append(get_cast(movie=movie))
                 data_dict['GENRES'].append(movie.info()['genres'])
                 funders = get_funders(movie=movie)
@@ -130,7 +131,7 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
                 logger.info(f"Successful retrieval of: YEAR {year} PAGE {page}")
             mssng_pages[year].remove(page)
             logger.info(mssng_pages)
-            data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTOR': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
+            data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTORS': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
         except requests.exceptions.RequestException as e:
             logger.info(e)
             logger.info(f"Failed retrieval of: YEAR {year} PAGE {page}")
@@ -171,7 +172,7 @@ def movie_gen_info(movie: tmdb.Movies) -> tuple:
     og_lang = movie.info()['original_language']
     plot = movie.info()['overview']
     if plot == "":
-        plot = "unknown"
+        plot = "No info."
     plot = plot.replace("\n", "").replace("\r", "").replace("\t", " ")
 
     return title, og_title, release_date, og_lang, plot
@@ -186,39 +187,18 @@ def get_directors(movie: tmdb.Movies) -> list:
             Object containing the required data to extract
     Returns: list[dict]
     """
-    director_list = []
-    director_dict = {}
-    found = False
     crew_list = movie.credits()['crew']
-    for member in crew_list:
-        if member['job'] == 'Director':
-            director_dict[member['id']] = member['name']
-            # If at least one director is found, set to True
-            found = True
-    if found:
-        director_list.append(director_dict)
+    director_list = []
+    if crew_list != []:
+        for member in crew_list:
+            if member['job'] == 'Director':
+                director_dict = {}
+                director_dict['id'] = member['id']
+                director_dict['name'] = member['name']
+                director_list.append(director_dict) if director_dict != {} else None
+        return director_list
     else:
-        director_dict["unknown"] = ""
-        director_list.append(director_dict)
-    return director_list
-
-
-# def get_cast(movie: tmdb.Movies) -> list:
-#     """
-#     Get a movie's cast members
-
-#     Args:
-#         movies: tmdb.Movies object
-#             Object containing the required data to extract
-#     Returns: list[dict]
-#     """
-#     cast_list = []
-#     cast_dict = {}
-#     cast_members = movie.credits()['cast']
-#     for member in cast_members:
-#         cast_dict[member['id']] = member['name']
-#     cast_list.append(cast_dict)
-#     return cast_list
+        return crew_list
 
 
 def get_cast(movie: tmdb.Movies) -> list:
@@ -230,19 +210,19 @@ def get_cast(movie: tmdb.Movies) -> list:
             Object containing the required data to extract
     Returns: list[dict]
     """
-    found = False
-    cast_dict = {}
     cast_list = movie.credits()['cast']
-    if cast_list == []:
-        cast_list = ['unknown']
-    else:
+    # New list will contain a dict of only the 'id' and 'name' key-value pairs, everything else is unnecessary
+    new_cast_list = []
+    if cast_list != []:
         for member in cast_list:
-            # New dict will only contain the 'id' and 'name' key-value pairs, everything else is unnecessary
-            cast_dict[member['id']] = member['name']
-            found = True
-    if found:
-        cast_list.append(cast_dict)
-    return cast_list
+            cast_dict = {}
+            cast_dict['id'] = member['id']
+            cast_dict['name'] = member['name']
+            new_cast_list.append(cast_dict) if cast_dict != {} else None
+        return new_cast_list
+    else:
+        return cast_list
+
 
 
 def get_funders(movie: tmdb.Movies) -> tuple:
@@ -256,9 +236,7 @@ def get_funders(movie: tmdb.Movies) -> tuple:
     """
     country_list = movie.info()['production_countries']
     company_list = movie.info()['production_companies']
-    if company_list == []:
-        company_list = ['unknown']
-    else:
+    if company_list != []:
         for company in company_list:
             company.pop('logo_path')
     return country_list, company_list
@@ -294,7 +272,7 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
     Returns: tuple[str, int, int, pd.DataFrame]
     """
 
-    data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTOR': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
+    data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTORS': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
     failed_page = None
     response = discover.movie(region=region, page=page, primary_release_year=year, include_adult=False, with_runtime_gte='40')
     try:
@@ -307,7 +285,7 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
             data_dict['RELEASE_DATE'].append(gen_info[2])
             data_dict['ORIGINAL_LANGUAGE'].append(gen_info[3])
             data_dict['PLOT'].append(gen_info[4])
-            data_dict['DIRECTOR'].append(get_directors(movie=movie))
+            data_dict['DIRECTORS'].append(get_directors(movie=movie))
             data_dict['CAST'].append(get_cast(movie=movie))
             data_dict['GENRES'].append(movie.info()['genres'])
             funders = get_funders(movie=movie)
@@ -316,7 +294,7 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
             data_dict['FINANCIAL'].append(get_financials(movie=movie))
 
         df = pd.DataFrame(data_dict)
-        df.fillna('unknown', inplace=True)
+        # df.fillna('unknown', inplace=True)
         df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
         filename = f"{region}_movie_data_{year}-{page}.csv"
         if output:
