@@ -1,4 +1,4 @@
-import glob
+from ast import literal_eval
 import json
 import logging
 from logging import INFO
@@ -43,11 +43,11 @@ def output_csv(region: str, year: int, df: pd.DataFrame, filename: str) -> None:
             name of the output csv file
     Returns: None
     """
-
     data_dir = "./data"
     output_dir = Path(f"{data_dir}/{region}_movie_data_{year}")
     output_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_dir / filename, index=False)
+
 
 @movies.command("merge_dfs")
 def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
@@ -64,16 +64,17 @@ def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
             (Optional) The dictionary to check for any pages missing
     Returns: pd.DataFrame
     """
-
     if missing == None or missing[year] == []:
-        sub_dir = f"./data/{region}_movie_data_{year}"
+        sub_dir = Path(f"./data/{region}_movie_data_{year}")
         try:
             # IGNORE MERGED CSV's, IF ANY
-            csv_list = [file for file in glob.glob(f'{sub_dir}/*.csv')]
-            logger.info(f"Merging {region} movie dataframes for YEAR: {year}...")
+            csv_list = [file for file in sub_dir.glob("**/*") if 'merged' not in file.name]
+            logger.info(f"Merging {region} movie dataframes for YEAR: {year}")
             df = pd.concat([pd.read_csv(csv) for csv in csv_list])
             df.drop_duplicates(inplace=True)
-            # df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
+            # Reading from csv converts dict types to str.. Convert back to dict to sort by values.
+            df['FINANCIAL'] = df['FINANCIAL'].apply(literal_eval)
+            df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
             logger.info("Saving merged dataframe to csv file")
             filename = f"{region}_movie_data_{year}-merged.csv"
             output_csv(region=region, year=year, df=df, filename=filename)
@@ -98,7 +99,6 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
             Dictionary consisting of key-value pairs of {year: [list of page numbers missing]}
     Returns: dict[int, list[int]] of any pages still missing
     """
-
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTORS': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
     logger.info("Attempting retrieval of missing pages...")
     for page in mssng_pages[year][:]:
@@ -123,7 +123,6 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
 
 
             df = pd.DataFrame(data_dict)
-            df.fillna('unknown', inplace=True)
             df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
             filename = f"{region}_movie_data_{year}-{page}.csv"
             if output:
@@ -150,7 +149,6 @@ def list_pages(region: str, year: int) -> list:
             Year to filter by
     Returns: a list[int] of all pages returned from search response
     """
-
     response = discover.movie(region=region, primary_release_year=year, include_adult=False, with_runtime_gte='40')
     pages = [page for page in range(1, response['total_pages'] + 1)]
     logger.info(f"YEAR {year}: PAGES {pages}")
@@ -224,7 +222,6 @@ def get_cast(movie: tmdb.Movies) -> list:
         return cast_list
 
 
-
 def get_funders(movie: tmdb.Movies) -> tuple:
     """
     Get the companies that helped produce a movie
@@ -271,7 +268,6 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
             Page number to send a request to
     Returns: tuple[str, int, int, pd.DataFrame]
     """
-
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTORS': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
     failed_page = None
     response = discover.movie(region=region, page=page, primary_release_year=year, include_adult=False, with_runtime_gte='40')
@@ -294,7 +290,6 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
             data_dict['FINANCIAL'].append(get_financials(movie=movie))
 
         df = pd.DataFrame(data_dict)
-        # df.fillna('unknown', inplace=True)
         df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
         filename = f"{region}_movie_data_{year}-{page}.csv"
         if output:
