@@ -107,7 +107,7 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
             for result in discover.results:
                 movie = tmdb.Movies(result['id'])
                 data_dict['ID'].append(result['id'])
-                gen_info = movie_gen_info(movie=movie)
+                gen_info = get_gen_info(movie=movie)
                 data_dict['TITLE'].append(gen_info[0])
                 data_dict['ORIGINAL_TITLE'].append(gen_info[1])
                 data_dict['RELEASE_DATE'].append(gen_info[2])
@@ -155,7 +155,7 @@ def list_pages(region: str, year: int) -> list:
     return pages
 
 
-def movie_gen_info(movie: tmdb.Movies) -> tuple:
+def get_gen_info(movie: tmdb.Movies) -> tuple:
     """
     Obtain some general information for a movie
 
@@ -236,6 +236,9 @@ def get_funders(movie: tmdb.Movies) -> tuple:
     if company_list != []:
         for company in company_list:
             company.pop('logo_path')
+            for k in company:
+                if company[k] == '':
+                    company[k] = 'no info'    
     return country_list, company_list
 
 
@@ -275,7 +278,7 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
         for result in discover.results:
             movie = tmdb.Movies(result['id'])
             data_dict['ID'].append(result['id'])
-            gen_info = movie_gen_info(movie=movie)
+            gen_info = get_gen_info(movie=movie)
             data_dict['TITLE'].append(gen_info[0])
             data_dict['ORIGINAL_TITLE'].append(gen_info[1])
             data_dict['RELEASE_DATE'].append(gen_info[2])

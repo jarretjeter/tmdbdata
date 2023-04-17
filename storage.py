@@ -150,6 +150,61 @@ def insert_actors(row, cursor: pymysql.cursors.DictCursor) -> None:
             cursor.execute(sql, (id, name))
 
 
+def insert_countries(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL countries table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    """
+    sql = """INSERT INTO `countries` (`id`, `name`)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY
+                UPDATE name=VALUES(name)"""
+    country_list = row.PRODUCTION_COUNTRIES
+    country_list = literal_eval(country_list)
+    if len(country_list) >= 1:
+        for country in country_list:
+            id = country['iso_3166_1']
+            name = country['name']
+            cursor.execute(sql, (id, name))
+
+
+def insert_companies(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL companies table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    """
+    company_list = row.PRODUCTION_COMPANIES
+    company_list = literal_eval(company_list)
+    if len(company_list) >= 1:
+        for company in company_list:
+            id = company['id']
+            name = company['name']
+            country_id = company['origin_country']
+
+            if country_id != 'no info':
+                sql = f"""INSERT INTO `companies` (`id`, `name`, `country`)
+                    VALUES(%s, %s, %s)
+                    ON DUPLICATE KEY
+                    UPDATE name=VALUES(name), country=VALUES(country)"""
+                cursor.execute(sql, (id, name, country_id))
+            else:
+                sql = """INSERT INTO `companies` (`id`, `name`)
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY
+                    UPDATE name=VALUES(name)"""
+                cursor.execute(sql, (id, name))
+
+
 def to_mysql(df: pd.DataFrame, year: int) -> None:
     """
     Insert Pandas DataFrame rows into a MySQL table.
@@ -177,6 +232,9 @@ def to_mysql(df: pd.DataFrame, year: int) -> None:
                     insert_genres(row=row, cursor=cursor)
                     insert_directors(row=row, cursor=cursor)
                     insert_actors(row=row, cursor=cursor)
+                    insert_countries(row=row, cursor=cursor)
+                    insert_companies(row=row, cursor=cursor)
+
                 conn.commit()
                 inserted += 1
         # Insertions per table
