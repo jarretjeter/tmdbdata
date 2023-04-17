@@ -33,9 +33,8 @@ db_name = database['db_name']
 blob_service_client = BlobServiceClient.from_connection_string(stor_conn_str)
 
 
-
 @storage.command("containers")
-def show_containers():
+def show_containers() -> str:
     """
     List all containers in a storage account
     """
@@ -44,9 +43,8 @@ def show_containers():
         print(f"Container: {container['name']}")
 
 
-
 @storage.command("upload")
-def blob_upload(region: str, year: str):
+def blob_upload(region: str, year: str) -> None:
     """
     Upload a single file to an Azure blob container
     """
@@ -60,16 +58,19 @@ def blob_upload(region: str, year: str):
             logger.info(f"Uploading to Azure Storage as blob: {filename}")
             blob_client.upload_blob(data, overwrite=True)
             logger.info(f"Uploaded {filename} successfully")
-    except Exception as ex:
-        print(f"Exception: \n{ex}")
-
-
-# CREATE FUNCTION TO DELETE BLOBS FROM CLI
+    except Exception as e:
+        print(e)
 
 
 def insert_movies(row, cursor: pymysql.cursors.DictCursor) -> None:
     """
-    insert pd.DataFrame row into MySQL movies table
+    insert pd.DataFrame row values into MySQL movies table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
     """
     sql = """INSERT INTO `movies` (`id`, `original_title`, `title`, `language`, `release_date`)
                     VALUES (%s, %s, %s, %s, %s)
@@ -81,13 +82,20 @@ def insert_movies(row, cursor: pymysql.cursors.DictCursor) -> None:
 
 def insert_genres(row, cursor: pymysql.cursors.DictCursor) -> None:
     """
-    insert pd.DataFrame row into MySQL genres table
+    insert pd.DataFrame row values into MySQL genres table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
     """
     sql = """INSERT INTO `genres` (`id`, `name`)
                     VALUES (%s, %s)
                     ON DUPLICATE KEY
                     UPDATE name=VALUES(name)"""
     genres_list = row.GENRES
+    # Change from str back to list[dict]
     genres_list = literal_eval(genres_list)
     if len(genres_list) >= 1:
         for genre in genres_list:
@@ -98,7 +106,13 @@ def insert_genres(row, cursor: pymysql.cursors.DictCursor) -> None:
 
 def insert_directors(row, cursor: pymysql.cursors.DictCursor) -> None:
     """
-    insert pd.DataFrame row into MySQL directors table
+    insert pd.DataFrame row values into MySQL directors table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
     """
     sql = """INSERT INTO `directors` (`id`, `name`)
                 VALUES (%s, %s)
@@ -115,7 +129,13 @@ def insert_directors(row, cursor: pymysql.cursors.DictCursor) -> None:
 
 def insert_actors(row, cursor: pymysql.cursors.DictCursor) -> None:
     """
-    insert pd.DataFrame row into MySQL actors table
+    insert pd.DataFrame row values into MySQL actors table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
     """
     sql = """INSERT INTO `actors` (`id`, `name`)
                 VALUES (%s, %s)
@@ -125,20 +145,75 @@ def insert_actors(row, cursor: pymysql.cursors.DictCursor) -> None:
     cast_list = literal_eval(cast_list)
     if len(cast_list) >= 1:
         for member in cast_list:
-            print(member)
-            print(type(member))
             id = member['id']
             name = member['name']
             cursor.execute(sql, (id, name))
 
 
-def to_mysql(df: pd.DataFrame, year: int):
+def insert_countries(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL countries table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    """
+    sql = """INSERT INTO `countries` (`id`, `name`)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY
+                UPDATE name=VALUES(name)"""
+    country_list = row.PRODUCTION_COUNTRIES
+    country_list = literal_eval(country_list)
+    if len(country_list) >= 1:
+        for country in country_list:
+            id = country['iso_3166_1']
+            name = country['name']
+            cursor.execute(sql, (id, name))
+
+
+def insert_companies(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL companies table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    """
+    company_list = row.PRODUCTION_COMPANIES
+    company_list = literal_eval(company_list)
+    if len(company_list) >= 1:
+        for company in company_list:
+            id = company['id']
+            name = company['name']
+            country_id = company['origin_country']
+
+            if country_id != 'no info':
+                sql = f"""INSERT INTO `companies` (`id`, `name`, `country`)
+                    VALUES(%s, %s, %s)
+                    ON DUPLICATE KEY
+                    UPDATE name=VALUES(name), country=VALUES(country)"""
+                cursor.execute(sql, (id, name, country_id))
+            else:
+                sql = """INSERT INTO `companies` (`id`, `name`)
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY
+                    UPDATE name=VALUES(name)"""
+                cursor.execute(sql, (id, name))
+
+
+def to_mysql(df: pd.DataFrame, year: int) -> None:
     """
     Insert Pandas DataFrame rows into a MySQL table.
 
     Args:
         df: pd.DataFrame
-            DataFrame object to use
+            DataFrame object to iterate over
+        year: int
+            Passed to the function from main(). Simply logs the year back after completion.
     Returns: None
     """
     try:
@@ -157,6 +232,9 @@ def to_mysql(df: pd.DataFrame, year: int):
                     insert_genres(row=row, cursor=cursor)
                     insert_directors(row=row, cursor=cursor)
                     insert_actors(row=row, cursor=cursor)
+                    insert_countries(row=row, cursor=cursor)
+                    insert_companies(row=row, cursor=cursor)
+
                 conn.commit()
                 inserted += 1
         # Insertions per table
