@@ -71,13 +71,32 @@ def insert_movies(row, cursor: pymysql.cursors.DictCursor) -> None:
             Tuple to access
         cursor: PyMySQL DictCursor object
             executes SQL statement
+    Returns: None
     """
     sql = """INSERT INTO `movies` (`id`, `original_title`, `title`, `language`, `release_date`)
                     VALUES (%s, %s, %s, %s, %s)
                     ON DUPLICATE KEY
                     UPDATE original_title=VALUES(original_title), title=VALUES(title), language=VALUES(language), release_date=VALUES(release_date)"""
-    cursor.execute(sql, (row.ID, row.ORIGINAL_TITLE, row.TITLE, row.ORIGINAL_LANGUAGE, 
-                    row.RELEASE_DATE))
+    cursor.execute(sql, (row.ID, row.ORIGINAL_TITLE, row.TITLE, 
+                        row.ORIGINAL_LANGUAGE, row.RELEASE_DATE))
+
+
+def insert_plots(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL plots table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    Returns: None
+    """
+    sql = """INSERT into `plots` (`plot`, `movie_id`)
+            VALUES(%s, %s)
+            ON DUPLICATE KEY
+            UPDATE plot=VALUES(plot)"""
+    cursor.execute(sql, (row.PLOT, row.ID))
 
 
 def insert_genres(row, cursor: pymysql.cursors.DictCursor) -> None:
@@ -89,6 +108,7 @@ def insert_genres(row, cursor: pymysql.cursors.DictCursor) -> None:
             Tuple to access
         cursor: PyMySQL DictCursor object
             executes SQL statement
+    Returns: None
     """
     sql = """INSERT INTO `genres` (`id`, `name`)
                     VALUES (%s, %s)
@@ -104,6 +124,30 @@ def insert_genres(row, cursor: pymysql.cursors.DictCursor) -> None:
             cursor.execute(sql, (id, name))
 
 
+def insert_movie_genres(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL movie_genres table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    Returns: None
+    """
+    sql = """INSERT INTO `movie_genres` (`movie_id`, `genre_id`)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY
+            UPDATE movie_id=VALUES(movie_id)"""
+    genres_list = row.GENRES
+    genres_list = literal_eval(genres_list)
+    movie_id = row.ID
+    if len(genres_list) >= 1:
+        for genre in genres_list:
+            genre_id = genre['id']
+            cursor.execute(sql, (movie_id, genre_id))
+
+
 def insert_directors(row, cursor: pymysql.cursors.DictCursor) -> None:
     """
     insert pd.DataFrame row values into MySQL directors table
@@ -113,6 +157,7 @@ def insert_directors(row, cursor: pymysql.cursors.DictCursor) -> None:
             Tuple to access
         cursor: PyMySQL DictCursor object
             executes SQL statement
+    Returns: None
     """
     sql = """INSERT INTO `directors` (`id`, `name`)
                 VALUES (%s, %s)
@@ -127,6 +172,30 @@ def insert_directors(row, cursor: pymysql.cursors.DictCursor) -> None:
             cursor.execute(sql, (id, name))
 
 
+def insert_movie_directors(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL the movie_directors table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    Returns: None
+    """
+    sql = """INSERT INTO `movie_directors` (`movie_id`, `director_id`)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY
+                UPDATE movie_id=VALUES(movie_id)"""
+    director_list = row.DIRECTORS
+    director_list = literal_eval(director_list)
+    movie_id = row.ID
+    if len(director_list) >= 1:
+        for director in director_list:
+            id = director['id']
+            cursor.execute(sql, (movie_id, id))
+
+
 def insert_actors(row, cursor: pymysql.cursors.DictCursor) -> None:
     """
     insert pd.DataFrame row values into MySQL actors table
@@ -136,6 +205,7 @@ def insert_actors(row, cursor: pymysql.cursors.DictCursor) -> None:
             Tuple to access
         cursor: PyMySQL DictCursor object
             executes SQL statement
+    Returns: None
     """
     sql = """INSERT INTO `actors` (`id`, `name`)
                 VALUES (%s, %s)
@@ -150,6 +220,30 @@ def insert_actors(row, cursor: pymysql.cursors.DictCursor) -> None:
             cursor.execute(sql, (id, name))
 
 
+def insert_movie_actors(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL the movie_actors table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    Returns: None
+    """
+    sql = """INSERT INTO `movie_actors` (`movie_id`, `actor_id`)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY
+                UPDATE movie_id=VALUES(movie_id)"""
+    cast_list = row.CAST
+    cast_list = literal_eval(cast_list)
+    movie_id = row.ID
+    if len(cast_list) >= 1:
+        for actor in cast_list:
+            actor_id = actor['id']
+            cursor.execute(sql, (movie_id, actor_id))
+
+
 def insert_countries(row, cursor: pymysql.cursors.DictCursor) -> None:
     """
     insert pd.DataFrame row values into MySQL countries table
@@ -159,6 +253,7 @@ def insert_countries(row, cursor: pymysql.cursors.DictCursor) -> None:
             Tuple to access
         cursor: PyMySQL DictCursor object
             executes SQL statement
+    Returns: None
     """
     sql = """INSERT INTO `countries` (`id`, `name`)
                 VALUES (%s, %s)
@@ -182,6 +277,7 @@ def insert_companies(row, cursor: pymysql.cursors.DictCursor) -> None:
             Tuple to access
         cursor: PyMySQL DictCursor object
             executes SQL statement
+    Returns: None
     """
     company_list = row.PRODUCTION_COMPANIES
     company_list = literal_eval(company_list)
@@ -192,7 +288,7 @@ def insert_companies(row, cursor: pymysql.cursors.DictCursor) -> None:
             country_id = company['origin_country']
 
             if country_id != 'no info':
-                sql = f"""INSERT INTO `companies` (`id`, `name`, `country`)
+                sql = """INSERT INTO `companies` (`id`, `name`, `country`)
                     VALUES(%s, %s, %s)
                     ON DUPLICATE KEY
                     UPDATE name=VALUES(name), country=VALUES(country)"""
@@ -203,6 +299,28 @@ def insert_companies(row, cursor: pymysql.cursors.DictCursor) -> None:
                     ON DUPLICATE KEY
                     UPDATE name=VALUES(name)"""
                 cursor.execute(sql, (id, name))
+
+
+def insert_movie_revenue(row, cursor: pymysql.cursors.DictCursor) -> None:
+    """
+    insert pd.DataFrame row values into MySQL movie_revenue table
+
+    Args:
+        row: pd.DataFrame row
+            Tuple to access
+        cursor: PyMySQL DictCursor object
+            executes SQL statement
+    Returns: None
+    """
+    sql = """INSERT INTO `movie_revenue` (`movie_id`, `revenue`, `budget`)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY
+            UPDATE revenue=VALUES(revenue)"""
+    movie_id = row.ID
+    fin_dict = row.FINANCIAL
+    revenue = fin_dict['revenue']
+    budget = fin_dict['budget']
+    cursor.execute(sql, (movie_id, revenue, budget))
 
 
 def to_mysql(df: pd.DataFrame, year: int) -> None:
@@ -229,11 +347,16 @@ def to_mysql(df: pd.DataFrame, year: int) -> None:
             with conn:
                 with conn.cursor() as cursor:
                     insert_movies(row=row, cursor=cursor)
+                    insert_plots(row=row, cursor=cursor)
                     insert_genres(row=row, cursor=cursor)
+                    insert_movie_genres(row=row, cursor=cursor)
                     insert_directors(row=row, cursor=cursor)
+                    insert_movie_directors(row=row, cursor=cursor)
                     insert_actors(row=row, cursor=cursor)
+                    insert_movie_actors(row=row, cursor=cursor)
                     insert_countries(row=row, cursor=cursor)
                     insert_companies(row=row, cursor=cursor)
+                    insert_movie_revenue(row=row, cursor=cursor)
 
                 conn.commit()
                 inserted += 1
