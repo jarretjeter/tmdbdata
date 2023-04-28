@@ -1,7 +1,7 @@
 import concurrent.futures
 import logging
 from logging import INFO
-from movies import *
+import movies
 from storage import blob_upload, to_mysql
 import sys
 import time
@@ -36,10 +36,10 @@ def main(region: str, year_start: int, year_end: int, upload: bool=True) -> any:
     
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for year in year_range:
-            pages = list_pages(region, year)
+            pages = movies.list_pages(region, year)
             mssng_pages[year] = []
             for page in pages:
-                futures.append(executor.submit(get_data, region, year, page))
+                futures.append(executor.submit(movies.get_data, region, year, page))
 
         for future in concurrent.futures.as_completed(futures):
             f_year = future.result()[1]
@@ -48,8 +48,8 @@ def main(region: str, year_start: int, year_end: int, upload: bool=True) -> any:
             
         logger.info(f"Missing: {mssng_pages}")
         for year in year_range:
-            retry_missing(region=region, year=year, mssng_pages=mssng_pages) if mssng_pages[year] != [] else None
-            df = merge_dfs(region, year, missing=mssng_pages)
+            movies.retry_missing(region=region, year=year, mssng_pages=mssng_pages) if mssng_pages[year] != [] else None
+            df = movies.merge_dfs(region, year, missing=mssng_pages)
             if upload:
                 blob_upload(region=region, year=year)
                 to_mysql(df=df, year=year)
