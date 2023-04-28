@@ -12,13 +12,18 @@ import movies
 
 class TestMovies(unittest.TestCase):
 
-    @patch('movies.list_pages')
-    def test_list_pages(self, mock_list_pages):
-        mock_list_pages.return_value = [1, 2, 3]
-        result = movies.list_pages()
+    # Use patch decorator to mock functions using http requests
+    @patch('movies.discover.movie')
+    def test_list_pages(self, mock_discover_movie):
+        # Control the value that the mocked object returns to my function
+        mock_discover_movie.return_value = {'total_pages': 6}
+        result = movies.list_pages('US', 1914)
+        mock_discover_movie.assert_called_with(region='US', primary_release_year=1914, include_adult=False, with_runtime_gte='40')
+
         self.assertIsInstance(result, list)
+        self.assertEqual(result, [1, 2, 3, 4, 5, 6])
         for item in result:
-            self.assertIsInstance(item, int, 'each result item is a str value')
+            self.assertIsInstance(item, int, 'each result item should be int value')
 
     @patch('movies.get_gen_info')
     def test_get_gen_info(self, mock_get_gen_info):
