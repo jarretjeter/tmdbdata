@@ -113,15 +113,15 @@ def get_gen_info(movie: tmdb.Movies) -> tuple:
             Object containing the required data to extract
     Returns: tuple[str, str, str, str, str]
     """
-    title = movie.info()['title']
-    og_title = movie.info()['original_title']
-    release_date = movie.info()['release_date']
-    og_lang = movie.info()['original_language']
-    plot = movie.info()['overview']
+    # response = movie.info()
+    title = movie.title
+    og_title = movie.original_title
+    release_date = movie.release_date
+    og_lang = movie.original_language
+    plot = movie.overview
     if plot == "":
         plot = "No info."
     plot = plot.replace("\n", "").replace("\r", "").replace("\t", " ")
-
     return title, og_title, release_date, og_lang, plot
 
 
@@ -180,8 +180,8 @@ def get_funders(movie: tmdb.Movies) -> tuple:
             Object containing the required data to extract
     Returns: tuple[list, list]
     """
-    country_list = movie.info()['production_countries']
-    company_list = movie.info()['production_companies']
+    country_list = movie.production_countries
+    company_list = movie.production_companies
     if company_list != []:
         for company in company_list:
             company.pop('logo_path')
@@ -201,8 +201,8 @@ def get_financials(movie: tmdb.Movies) -> dict:
     Returns: dict[str, int]
     """
     finance_dict = {}
-    finance_dict['budget'] = movie.info()['budget']
-    finance_dict['revenue'] = movie.info()['revenue']
+    finance_dict['budget'] = movie.budget
+    finance_dict['revenue'] = movie.revenue
     return finance_dict
 
 
@@ -226,27 +226,28 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
     try:
         for result in discover.results:
             movie = tmdb.Movies(result['id'])
+            movie.info()
             data_dict['ID'].append(result['id'])
-            gen_info = get_gen_info(movie=movie)
+            gen_info = get_gen_info(movie)
             data_dict['TITLE'].append(gen_info[0])
             data_dict['ORIGINAL_TITLE'].append(gen_info[1])
             data_dict['RELEASE_DATE'].append(gen_info[2])
             data_dict['ORIGINAL_LANGUAGE'].append(gen_info[3])
             data_dict['PLOT'].append(gen_info[4])
-            data_dict['DIRECTORS'].append(get_directors(movie=movie))
-            data_dict['CAST'].append(get_cast(movie=movie))
-            data_dict['GENRES'].append(movie.info()['genres'])
-            funders = get_funders(movie=movie)
+            data_dict['DIRECTORS'].append(get_directors(movie))
+            data_dict['CAST'].append(get_cast(movie))
+            data_dict['GENRES'].append(movie.genres)
+            funders = get_funders(movie)
             data_dict['PRODUCTION_COUNTRIES'].append(funders[0])
             data_dict['PRODUCTION_COMPANIES'].append(funders[1])
-            data_dict['FINANCIAL'].append(get_financials(movie=movie))
+            data_dict['FINANCIAL'].append(get_financials(movie))
 
         df = pd.DataFrame(data_dict)
         df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
         filename = f"{region}_movie_data_{year}-{page}.csv"
         if output:
             logger.info(f"Saving YEAR: {year}, PAGE: {page} to csv")
-            output_csv(region=region, year=year, df=df, filename=filename)
+            output_csv(region, year, df, filename)
     except requests.exceptions.RequestException as e:
         logger.info(e)
         logger.info(f"Failed to get YEAR: {year}, PAGE: {page}")
@@ -274,27 +275,27 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
             response = discover.movie(region=region, page=page, primary_release_year=year, include_adult=False, with_runtime_gte='40')
             for result in discover.results:
                 movie = tmdb.Movies(result['id'])
+                movie.info()
                 data_dict['ID'].append(result['id'])
-                gen_info = get_gen_info(movie=movie)
+                gen_info = get_gen_info(movie)
                 data_dict['TITLE'].append(gen_info[0])
                 data_dict['ORIGINAL_TITLE'].append(gen_info[1])
                 data_dict['RELEASE_DATE'].append(gen_info[2])
                 data_dict['ORIGINAL_LANGUAGE'].append(gen_info[3])
                 data_dict['PLOT'].append(gen_info[4])
-                data_dict['DIRECTORS'].append(get_directors(movie=movie))
-                data_dict['CAST'].append(get_cast(movie=movie))
-                data_dict['GENRES'].append(movie.info()['genres'])
-                funders = get_funders(movie=movie)
+                data_dict['DIRECTORS'].append(get_directors(movie))
+                data_dict['CAST'].append(get_cast(movie))
+                data_dict['GENRES'].append(movie.genres)
+                funders = get_funders(movie)
                 data_dict['PRODUCTION_COUNTRIES'].append(funders[0])
                 data_dict['PRODUCTION_COMPANIES'].append(funders[1])
-                data_dict['FINANCIAL'].append(get_financials(movie=movie))
-
+                data_dict['FINANCIAL'].append(get_financials(movie))
 
             df = pd.DataFrame(data_dict)
             df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
             filename = f"{region}_movie_data_{year}-{page}.csv"
             if output:
-                output_csv(region=region, year=year, df=df, filename=filename)
+                output_csv(region, year, df, filename)
                 logger.info(f"Successful retrieval of: YEAR {year} PAGE {page}")
             mssng_pages[year].remove(page)
             logger.info(mssng_pages)

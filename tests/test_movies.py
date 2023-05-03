@@ -1,4 +1,4 @@
-from collections import namedtuple
+import pandas as pd
 from pathlib import Path
 import sys
 import tmdbsimple as tmdb
@@ -40,6 +40,7 @@ class TestMovies(unittest.TestCase):
         # mocked tmdb.Movies() will return a movie object with the above defined values
         mock_tmdb_Movies.return_value = movie
         result = movies.get_gen_info(tmdb.Movies())
+        self.assertIsInstance(result, tuple)
         for item in result:
             self.assertIsInstance(item, str, 'each result item is a str value')
 
@@ -89,16 +90,14 @@ class TestMovies(unittest.TestCase):
     @patch('movies.tmdb.Movies')
     def test_get_funders(self, mock_tmdb_Movies):
         movie = MagicMock()
-        movie.info.return_value = {
-            'production_countries': [{'iso_3166_1': 'US', 'name': 'United States of America'}], 
-            'production_companies':[{'id': 79,
+        movie.production_countries =  [{'iso_3166_1': 'US', 'name': 'United States of America'}]
+        movie.production_companies = [{'id': 79,
             'logo_path': '/tpFpsqbleCzEE2p5EgvUq6ozfCA.png',
             'name': 'Village Roadshow Pictures',
             'origin_country': 'US'}]
-            }
         
         result = movies.get_funders(movie)
-
+        self.assertIsInstance(result, tuple)
         for item in result:
             self.assertIsInstance(item, list, 'each result should be a list')
             for list_item in item:
@@ -107,6 +106,36 @@ class TestMovies(unittest.TestCase):
                     self.assertIsInstance(k, str, 'each key should be a str value')
                     self.assertIsInstance(v, (int, str), 'key values can be int or str')
 
+    @patch('movies.tmdb.Movies')
+    def test_get_financials(self, mock_tmdb_Movies):
+        movie = MagicMock()
+        movie.budget = 63000000
+        movie.revenue = 463517383
+        result = movies.get_financials(movie)
+        self.assertIsInstance(result, dict)
+        for k, v in result.items():
+            self.assertIsInstance(k, str)
+            self.assertIsInstance(v, int)
+
+    @patch('pandas.DataFrame.to_csv')
+    def test_output_csv(self, mock_to_csv):
+        data_dir = './data'
+        region = 'US'
+        year = '2077'
+        df = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
+        filename = f'{region}_movie_data_{year}-1.csv'
+        movies.output_csv(region, year, df, filename)
+        test_dir = Path(f"{data_dir}/{region}_movie_data_{year}")
+        self.assertTrue(test_dir.is_dir())
+        mock_to_csv.assert_called_with(test_dir/filename, index=False)
+
+    @patch('pandas.DataFrame.to_csv')
+    def test_merge_dfs(self, mock_to_csv):
+        region = 'US'
+        year = '1913'
+        df = movies.merge_dfs(region, year, missing=None)
+        self.assertIsInstance(df, pd.DataFrame)
+        
 
 
 if __name__ == '__main__':
