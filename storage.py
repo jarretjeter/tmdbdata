@@ -359,7 +359,7 @@ def to_mysql(df: pd.DataFrame, year: int) -> None:
                     insert_movie_revenue(row=row, cursor=cursor)
 
                 conn.commit()
-                inserted += 1
+                inserted += cursor.rowcount
         # Insertions per table
         logger.info(f"Table insertions for {year} complete. {inserted}/{num_rows} rows inserted.")
     

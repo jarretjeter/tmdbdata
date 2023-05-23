@@ -14,7 +14,7 @@ logger: logging.Logger = logging
 
 
 @app.command("run_main")
-def main(region: str, year_start: int, year_end: int, upload: bool=True) -> any:
+def main(region: str, year_start: int, year_end: int, blob: bool=True, sql: bool=True) -> any:
     """
     Pipeline orchestration to get all data for every page in a specified range of years
 
@@ -25,8 +25,10 @@ def main(region: str, year_start: int, year_end: int, upload: bool=True) -> any:
             Year to start filtering at
         year_end: int
             Year to stop filtering at
-        upload: bool, default True
-            (Optional) Upload data to Azure storage
+        blob: bool, default True
+            (Optional) Upload data to Azure storage blob container
+        sql: bool, default True
+            (Optional) Upload data to MySQL database
     Returns: None
     """
     tm1 = time.perf_counter()
@@ -48,10 +50,11 @@ def main(region: str, year_start: int, year_end: int, upload: bool=True) -> any:
             
         logger.info(f"Missing: {mssng_pages}")
         for year in year_range:
-            movies.retry_missing(region=region, year=year, mssng_pages=mssng_pages) if mssng_pages[year] != [] else None
-            df = movies.merge_dfs(region, year, missing=mssng_pages)
-            if upload:
+            movies.retry_missing(region, year, mssng_pages) if mssng_pages[year] != [] else None
+            df = movies.merge_dfs(region, year, mssng_pages)
+            if blob:
                 blob_upload(region=region, year=year)
+            if sql:
                 to_mysql(df=df, year=year)
 
     tm2 = time.perf_counter()

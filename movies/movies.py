@@ -74,7 +74,7 @@ def merge_dfs(region: str, year: int, missing=None) -> pd.DataFrame:
             df.drop_duplicates(inplace=True)
             # Reading from csv converts dict types to str.. Convert back to dict to sort by values.
             df['FINANCIAL'] = df['FINANCIAL'].apply(literal_eval)
-            df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
+            df.sort_values(by=['FINANCIAL'], key=lambda k: k.apply(lambda x: x['revenue']), ascending=False, inplace=True)
             logger.info("Saving merged dataframe to csv file")
             filename = f"{region}_movie_data_{year}-merged.csv"
             output_csv(region=region, year=year, df=df, filename=filename)
@@ -113,7 +113,6 @@ def get_gen_info(movie: tmdb.Movies) -> tuple:
             Object containing the required data to extract
     Returns: tuple[str, str, str, str, str]
     """
-    # response = movie.info()
     title = movie.title
     og_title = movie.original_title
     release_date = movie.release_date
@@ -125,16 +124,16 @@ def get_gen_info(movie: tmdb.Movies) -> tuple:
     return title, og_title, release_date, og_lang, plot
 
 
-def get_directors(movie: tmdb.Movies) -> list:
+def get_directors(movie_credits: dict) -> list:
     """
     Get a movie's directors
 
     Args:
-        movie: tmdb.Movies object
-            Object containing the required data to extract
+        movie_credits: Dict
+            returned from the tmdb.Movies.credits() method
     Returns: list[dict]
     """
-    crew_list = movie.credits()['crew']
+    crew_list = movie_credits['crew']
     director_list = []
     if crew_list != []:
         for member in crew_list:
@@ -148,16 +147,16 @@ def get_directors(movie: tmdb.Movies) -> list:
         return crew_list
 
 
-def get_cast(movie: tmdb.Movies) -> list:
+def get_cast(movie_credits: dict) -> list:
     """
     Get a movie's cast members
 
     Args:
-        movie: tmdb.Movies object
-            Object containing the required data to extract
+        movie_credits: Dict
+            returned from the tmdb.Movies.credits() method
     Returns: list[dict]
     """
-    cast_list = movie.credits()['cast']
+    cast_list = movie_credits['cast']
     # New list will contain a dict of only the 'id' and 'name' key-value pairs, everything else is unnecessary
     new_cast_list = []
     if cast_list != []:
@@ -218,6 +217,8 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
             Year to filter by
         page: int
             Page number to send a request to
+        output: bool, default True
+            Save data to csv output
     Returns: tuple[str, int, int, pd.DataFrame]
     """
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTORS': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
@@ -227,6 +228,7 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
         for result in discover.results:
             movie = tmdb.Movies(result['id'])
             movie.info()
+            credits = movie.credits()
             data_dict['ID'].append(result['id'])
             gen_info = get_gen_info(movie)
             data_dict['TITLE'].append(gen_info[0])
@@ -234,8 +236,8 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
             data_dict['RELEASE_DATE'].append(gen_info[2])
             data_dict['ORIGINAL_LANGUAGE'].append(gen_info[3])
             data_dict['PLOT'].append(gen_info[4])
-            data_dict['DIRECTORS'].append(get_directors(movie))
-            data_dict['CAST'].append(get_cast(movie))
+            data_dict['DIRECTORS'].append(get_directors(credits))
+            data_dict['CAST'].append(get_cast(credits))
             data_dict['GENRES'].append(movie.genres)
             funders = get_funders(movie)
             data_dict['PRODUCTION_COUNTRIES'].append(funders[0])
@@ -243,7 +245,7 @@ def get_data(region: str, year: int, page: int=1, output=True) -> tuple:
             data_dict['FINANCIAL'].append(get_financials(movie))
 
         df = pd.DataFrame(data_dict)
-        df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
+        df.sort_values(by=['FINANCIAL'], key=lambda k: k.apply(lambda x: x['revenue']), ascending=False, inplace=True)
         filename = f"{region}_movie_data_{year}-{page}.csv"
         if output:
             logger.info(f"Saving YEAR: {year}, PAGE: {page} to csv")
@@ -266,6 +268,8 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
             Year to filter by
         mssng_pages: dict
             Dictionary consisting of key-value pairs of {year: [list of page numbers missing]}
+        output: bool, default True
+            Save data to csv output
     Returns: dict[int, list[int]] of any pages still missing
     """
     data_dict = {'ID': [], 'TITLE': [], 'ORIGINAL_TITLE': [], 'RELEASE_DATE': [], 'ORIGINAL_LANGUAGE': [], 'PLOT': [], 'DIRECTORS': [], 'CAST': [], 'GENRES': [], 'PRODUCTION_COUNTRIES': [], 'PRODUCTION_COMPANIES': [], 'FINANCIAL': []}
@@ -276,6 +280,7 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
             for result in discover.results:
                 movie = tmdb.Movies(result['id'])
                 movie.info()
+                credits = movie.credits()
                 data_dict['ID'].append(result['id'])
                 gen_info = get_gen_info(movie)
                 data_dict['TITLE'].append(gen_info[0])
@@ -283,8 +288,8 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
                 data_dict['RELEASE_DATE'].append(gen_info[2])
                 data_dict['ORIGINAL_LANGUAGE'].append(gen_info[3])
                 data_dict['PLOT'].append(gen_info[4])
-                data_dict['DIRECTORS'].append(get_directors(movie))
-                data_dict['CAST'].append(get_cast(movie))
+                data_dict['DIRECTORS'].append(get_directors(credits))
+                data_dict['CAST'].append(get_cast(credits))
                 data_dict['GENRES'].append(movie.genres)
                 funders = get_funders(movie)
                 data_dict['PRODUCTION_COUNTRIES'].append(funders[0])
@@ -292,7 +297,7 @@ def retry_missing(region: str, year: int, mssng_pages, output=True) -> dict:
                 data_dict['FINANCIAL'].append(get_financials(movie))
 
             df = pd.DataFrame(data_dict)
-            df.sort_values(by=['FINANCIAL'], key=lambda k: k.str['revenue'], ascending=False, inplace=True)
+            df.sort_values(by=['FINANCIAL'], key=lambda k: k.apply(lambda x: x['revenue']), ascending=False, inplace=True)
             filename = f"{region}_movie_data_{year}-{page}.csv"
             if output:
                 output_csv(region, year, df, filename)
