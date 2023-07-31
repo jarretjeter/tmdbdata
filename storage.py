@@ -335,37 +335,33 @@ def to_mysql(df: pd.DataFrame, year: int) -> None:
     Returns: None
     """
     try:
-        num_rows = len(df)
-        inserted = 0
-        for row in df.itertuples(index=False):
+        conn = pymysql.connect(host='localhost',
+                            user=user,
+                            password=passwd,
+                            database=db_name,
+                            cursorclass=pymysql.cursors.DictCursor)
+        
+        with conn.cursor() as cursor:
+            for row in df.itertuples(index=False):
+                insert_movies(row=row, cursor=cursor)
+                insert_plots(row=row, cursor=cursor)
+                insert_genres(row=row, cursor=cursor)
+                insert_movie_genres(row=row, cursor=cursor)
+                insert_directors(row=row, cursor=cursor)
+                insert_movie_directors(row=row, cursor=cursor)
+                insert_actors(row=row, cursor=cursor)
+                insert_movie_actors(row=row, cursor=cursor)
+                insert_countries(row=row, cursor=cursor)
+                insert_companies(row=row, cursor=cursor)
+                insert_movie_revenue(row=row, cursor=cursor)
 
-            conn = pymysql.connect(host='localhost',
-                                user=user,
-                                password=passwd,
-                                database=db_name,
-                                cursorclass=pymysql.cursors.DictCursor)
-            with conn:
-                with conn.cursor() as cursor:
-                    insert_movies(row=row, cursor=cursor)
-                    insert_plots(row=row, cursor=cursor)
-                    insert_genres(row=row, cursor=cursor)
-                    insert_movie_genres(row=row, cursor=cursor)
-                    insert_directors(row=row, cursor=cursor)
-                    insert_movie_directors(row=row, cursor=cursor)
-                    insert_actors(row=row, cursor=cursor)
-                    insert_movie_actors(row=row, cursor=cursor)
-                    insert_countries(row=row, cursor=cursor)
-                    insert_companies(row=row, cursor=cursor)
-                    insert_movie_revenue(row=row, cursor=cursor)
-
-                conn.commit()
-                inserted += cursor.rowcount
-        # Insertions per table
-        logger.info(f"Table insertions for {year} complete. {inserted}/{num_rows} rows inserted.")
+            conn.commit()
     
     except pymysql.Error as e:
         logger.info(e)
         conn.rollback()
+
+    conn.close()
 
 
 
